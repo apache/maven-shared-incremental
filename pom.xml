@@ -36,14 +36,19 @@
   </description>
 
   <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/maven/shared/trunk/maven-shared-incremental</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/maven/shared/trunk/maven-shared-incremental</developerConnection>
-    <url>http://svn.apache.org/viewvc/maven/shared/trunk/maven-shared-incremental</url>
+    <connection>scm:git:https://gitbox.apache.org/repos/asf/maven-shared-incremental.git</connection>
+    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/maven-shared-incremental.git</developerConnection>
+    <url>https://github.com/apache/maven-shared-incremental/tree/${project.scm.tag}</url>
+    <tag>HEAD</tag>
   </scm>
   <issueManagement>
     <system>jira</system>
     <url>https://jira.codehaus.org/browse/MSHARED/component/12326453</url>
   </issueManagement>
+  <ciManagement>
+    <system>Jenkins</system>
+    <url>https://builds.apache.org/job/maven-box/job/maven-shared-incremental/</url>
+  </ciManagement>
   <distributionManagement>
     <site>
       <id>apache.website</id>
