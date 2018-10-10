@@ -28,8 +28,18 @@ import org.apache.maven.shared.utils.io.DirectoryScanner;
 import org.apache.maven.shared.utils.io.FileUtils;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Various helper methods to support incremental builds
@@ -42,7 +52,7 @@ public class IncrementalBuildHelper
     private static final String MAVEN_STATUS_ROOT = "maven-status";
     public static final String CREATED_FILES_LST_FILENAME = "createdFiles.lst";
     private static final String INPUT_FILES_LST_FILENAME = "inputFiles.lst";
-
+    private static final String DEPENDENCY_INFO_FILENAME = "dependencies.info";
     private static final String[] EMPTY_ARRAY = new String[0];
 
     /**
@@ -66,6 +76,15 @@ public class IncrementalBuildHelper
      * called, this will contain the list of files in the build directory.
      */
     private String[] filesBeforeAction = new String[0];
+
+    /**
+     * Used to keep dependencies info.
+     * @see #dependencyTreeChanged(IncrementalBuildHelperRequest)
+     * @see #keepDependencyInfo()
+     */
+    private final List<File> classpathElements = new ArrayList<File>();
+    private final Map<File, Long> dependencyInfo = new HashMap<File, Long>();
+
 
     public IncrementalBuildHelper( MojoExecution mojoExecution, MavenSession mavenSession )
     {
@@ -359,6 +378,143 @@ public class IncrementalBuildHelper
         }
 
     }
+    /**
+     * Detect whether the dependencies has changed since the last build.
+     *
+     * @param incrementalBuildHelperRequest
+     * @return <code>true</code> if the set of dependencies got changed since the last build.
+     * @throws MojoExecutionException
+     */
+    public boolean dependencyTreeChanged( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
+            throws MojoExecutionException
+    {
+        File mojoConfigBase = getMojoStatusDirectory();
+        File mojoConfigFile = new File ( mojoConfigBase, DEPENDENCY_INFO_FILENAME );
+
+        classpathElements.clear();
+        dependencyInfo.clear();
+
+        final List<String> classpathElementsNew = incrementalBuildHelperRequest.getClasspathElements();
+
+        for ( String  classPathElement : classpathElementsNew )
+        {
+            File artifactPath = new File ( classPathElement );
+            if ( artifactPath.isFile() )
+            {
+                dependencyInfo.put( artifactPath, artifactPath.lastModified() );
+                classpathElements.add( artifactPath );
+            }
+        }
+        if ( dependencyInfo == null )
+        {
+            return false;
+        }
+        if ( !mojoConfigFile.exists() )
+        {
+            //no file, assume rebuild
+            return true;
+        }
+
+        Map<File, Long> origDependencyInfo;
+        List<File> origClasspathElements;
+        try
+        {
+            ObjectInputStream ois = new ObjectInputStream ( new FileInputStream( mojoConfigFile ) );
+            origClasspathElements = ( List<File> ) ois.readObject();
+            origDependencyInfo = ( Map<File, Long> ) ois.readObject();
+            ois.close();
+        }
+        catch ( FileNotFoundException e )
+        {
+            //no file, assume rebuild
+            return true;
+        }
+        catch ( IOException e )
+        {
+            //assume rebuild
+            return true;
+        }
+        catch ( ClassNotFoundException e )
+        {
+            //unexpected exception, assume rebuild
+            return true;
+        }
+        // Check newly added dependencies
+
+        Set<File> newDependencies = new HashSet<File>( dependencyInfo.keySet() );
+        newDependencies.removeAll( origDependencyInfo.keySet() );
+        if ( !newDependencies.isEmpty() )
+        {
+            // new dependencies are detected
+            return true;
+        }
+
+
+        // Check removed dependencies
+
+        Set<File> removedDependencies = new HashSet<File>( origDependencyInfo.keySet() );
+        removedDependencies.removeAll( dependencyInfo.keySet() );
+        if ( !removedDependencies.isEmpty() )
+        {
+            //removed dependencies are detected
+            return true;
+        }
+
+
+        // Here keys of both dependencyInfo and origDependencyInfo are equal.
+        // Let's check the values.
+        for ( Map.Entry<File, Long> di : dependencyInfo.entrySet() )
+        {
+            final Long originalTimestamp = origDependencyInfo.get( di.getKey() );
+            final Long timestamp = di.getValue();
+            if ( !originalTimestamp.equals( timestamp ) )
+            {
+                //modified AR is detected
+                return true;
+            }
+        }
+
+        if ( !origClasspathElements.equals( classpathElements ) )
+        {
+            //order of JARs in classpath is changed
+            return true;
+        }
+
+        // obviously there was no new file detected.
+        return false;
+
+    }
+
+    public void keepDependencyInfo() throws MojoExecutionException
+    {
+        File mojoConfigBase = getMojoStatusDirectory();
+        File mojoConfigFile = new File( mojoConfigBase, DEPENDENCY_INFO_FILENAME );
+
+        if ( dependencyInfo == null )
+        {
+            mojoConfigFile.delete();
+            return;
+        }
+
+        try
+        {
+            ObjectOutputStream oos = new ObjectOutputStream( new FileOutputStream( mojoConfigFile ) );
+            oos.writeObject( classpathElements );
+            oos.writeObject( dependencyInfo );
+            oos.close();
+        }
+        catch ( FileNotFoundException ex )
+        {
+            //unexpected exception. it will rebuild
+        }
+        catch ( IOException ex )
+        {
+            //can't write to file, it will rebuild
+            mojoConfigFile.delete();
+        }
+    }
+
+
 
     private String[] toArrayOfPath( Set<File> files )
     {

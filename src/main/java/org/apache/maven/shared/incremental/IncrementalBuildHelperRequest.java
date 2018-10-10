@@ -22,6 +22,9 @@ package org.apache.maven.shared.incremental;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * @author Olivier Lamy
@@ -32,6 +35,10 @@ public class IncrementalBuildHelperRequest
     private Set<File> inputFiles;
 
     private File outputDirectory;
+
+    private List<String> classpathElements;
+
+    private Map<File, Long> dependencyInfo;
 
     public IncrementalBuildHelperRequest()
     {
@@ -73,4 +80,25 @@ public class IncrementalBuildHelperRequest
         this.outputDirectory = outputDirectory;
         return this;
     }
+
+    public List<String> getClasspathElements()
+    {
+        if ( classpathElements == null )
+        {
+            this.classpathElements = new ArrayList<String>();
+        }
+        return classpathElements;
+    }
+
+    public void setClasspathElements( List<String> classpathElements )
+    {
+        this.classpathElements = classpathElements;
+    }
+
+    public IncrementalBuildHelperRequest classpathElements( List<String> classpathElements )
+    {
+        this.classpathElements = classpathElements;
+        return this;
+    }
+
 }
