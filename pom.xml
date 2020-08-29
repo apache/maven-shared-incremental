@@ -47,7 +47,7 @@
   </issueManagement>
   <ciManagement>
     <system>Jenkins</system>
-    <url>https://builds.apache.org/job/maven-box/job/maven-shared-incremental/</url>
+    <url>https://ci-builds.apache.org/job/Maven/job/maven-box/job/maven-shared-incremental/</url>
   </ciManagement>
   <distributionManagement>
     <site>
