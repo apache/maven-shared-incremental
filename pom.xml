@@ -22,7 +22,7 @@
   <parent>
     <groupId>org.apache.maven.shared</groupId>
     <artifactId>maven-shared-components</artifactId>
-    <version>34</version>
+    <version>35-SNAPSHOT</version>
     <relativePath></relativePath>
   </parent>
 
@@ -57,7 +57,7 @@
   </distributionManagement>
 
   <properties>
-    <mavenVersion>2.2.1</mavenVersion>
+    <mavenVersion>4.0.0-alpha-1-SNAPSHOT</mavenVersion>
     <javaVersion>8</javaVersion>
     <project.build.outputTimestamp>2020-04-04T09:03:59Z</project.build.outputTimestamp>
   </properties>
@@ -114,7 +114,7 @@
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-shared-utils</artifactId>
-      <version>0.7</version>
+      <version>4.0.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
