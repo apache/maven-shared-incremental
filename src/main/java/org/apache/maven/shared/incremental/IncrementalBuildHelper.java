@@ -19,10 +19,9 @@ package org.apache.maven.shared.incremental;
  * under the License.
  */
 
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoExecution;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.api.MojoExecution;
+import org.apache.maven.api.Project;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.shared.utils.io.DirectoryScanResult;
 import org.apache.maven.shared.utils.io.DirectoryScanner;
 import org.apache.maven.shared.utils.io.FileUtils;
@@ -53,7 +52,7 @@ public class IncrementalBuildHelper
     /**
      * Needed for storing the status for the incremental build support.
      */
-    private MavenProject mavenProject;
+    private Project mavenProject;
 
     /**
      * Used for detecting changes between the Mojo execution.
@@ -67,12 +66,7 @@ public class IncrementalBuildHelper
      */
     private String[] filesBeforeAction = new String[0];
 
-    public IncrementalBuildHelper( MojoExecution mojoExecution, MavenSession mavenSession )
-    {
-        this( mojoExecution, getMavenProject( mavenSession ) );
-    }
-
-    public IncrementalBuildHelper( MojoExecution mojoExecution, MavenProject mavenProject )
+    public IncrementalBuildHelper( MojoExecution mojoExecution, Project mavenProject )
     {
         if ( mavenProject == null )
         {
@@ -85,19 +79,6 @@ public class IncrementalBuildHelper
 
         this.mavenProject = mavenProject;
         this.mojoExecution = mojoExecution;
-    }
-
-    /**
-     * small helper method to allow for the nullcheck in the ct invocation
-     */
-    private static MavenProject getMavenProject( MavenSession mavenSession )
-    {
-        if ( mavenSession == null )
-        {
-            throw new IllegalArgumentException( "MavenSession must not be null!" );
-        }
-
-        return mavenSession.getCurrentProject();
     }
 
     /**
@@ -130,22 +111,22 @@ public class IncrementalBuildHelper
      * @return the directory for storing status information of the current Mojo execution.
      */
     public File getMojoStatusDirectory()
-        throws MojoExecutionException
+        throws MojoException
     {
         if ( mojoExecution == null )
         {
-            throw new MojoExecutionException( "MojoExecution could not get resolved" );
+            throw new MojoException( "MojoExecution could not get resolved" );
         }
 
-        File buildOutputDirectory = new File( mavenProject.getBuild().getDirectory() );
+        File buildOutputDirectory = new File( mavenProject.getModel().getBuild().getDirectory() );
 
         //X TODO the executionId contains -cli and -mojoname
         //X we should remove those postfixes as it should not make
         //X any difference whether being run on the cli or via build
         String mojoStatusPath =
             MAVEN_STATUS_ROOT + File.separator
-                + mojoExecution.getMojoDescriptor().getPluginDescriptor().getArtifactId() + File.separator
-                + mojoExecution.getMojoDescriptor().getGoal() + File.separator + mojoExecution.getExecutionId();
+                + mojoExecution.getPlugin().getArtifactId() + File.separator
+                + mojoExecution.getGoal() + File.separator + mojoExecution.getExecutionId();
 
         File mojoStatusDir = new File( buildOutputDirectory, mojoStatusPath );
 
@@ -164,10 +145,10 @@ public class IncrementalBuildHelper
      *
      * @param incrementalBuildHelperRequest
      * @return <code>true</code> if the set of inputFiles got changed since the last build.
-     * @throws MojoExecutionException
+     * @throws MojoException
      */
     public boolean inputFileTreeChanged( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
-        throws MojoExecutionException
+        throws MojoException
     {
         File mojoConfigBase = getMojoStatusDirectory();
         File mojoConfigFile = new File( mojoConfigBase, INPUT_FILES_LST_FILENAME );
@@ -182,7 +163,7 @@ public class IncrementalBuildHelper
             }
             catch ( IOException e )
             {
-                throw new MojoExecutionException( "Error reading old mojo status " + mojoConfigFile, e );
+                throw new MojoException( "Error reading old mojo status " + mojoConfigFile, e );
             }
         }
 
@@ -201,7 +182,7 @@ public class IncrementalBuildHelper
         }
         catch ( IOException e )
         {
-            throw new MojoExecutionException( "Error while storing the mojo status", e );
+            throw new MojoException( "Error while storing the mojo status", e );
         }
 
         return ( dsr.getFilesAdded().length > 0 || dsr.getFilesRemoved().length > 0 );
@@ -216,10 +197,10 @@ public class IncrementalBuildHelper
      *
      * @param dirScanner
      * @return <code>true</code> if the set of inputFiles got changed since the last build.
-     * @throws MojoExecutionException
+     * @throws MojoException
      */
     public boolean inputFileTreeChanged( DirectoryScanner dirScanner )
-        throws MojoExecutionException
+        throws MojoException
     {
         File mojoConfigBase = getMojoStatusDirectory();
         File mojoConfigFile = new File( mojoConfigBase, INPUT_FILES_LST_FILENAME );
@@ -234,7 +215,7 @@ public class IncrementalBuildHelper
             }
             catch ( IOException e )
             {
-                throw new MojoExecutionException( "Error reading old mojo status " + mojoConfigFile, e );
+                throw new MojoException( "Error reading old mojo status " + mojoConfigFile, e );
             }
         }
 
@@ -247,7 +228,7 @@ public class IncrementalBuildHelper
         }
         catch ( IOException e )
         {
-            throw new MojoExecutionException( "Error while storing new mojo status" + mojoConfigFile, e );
+            throw new MojoException( "Error while storing new mojo status" + mojoConfigFile, e );
         }
 
         DirectoryScanResult dsr = dirScanner.diffIncludedFiles( oldInputFiles );
@@ -276,10 +257,10 @@ public class IncrementalBuildHelper
      *
      * @param incrementalBuildHelperRequest
      * @return all files which got created in the previous build and have been deleted now.
-     * @throws MojoExecutionException
+     * @throws MojoException
      */
     public String[] beforeRebuildExecution( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
-        throws MojoExecutionException
+        throws MojoException
     {
         File mojoConfigBase = getMojoStatusDirectory();
         File mojoConfigFile = new File( mojoConfigBase, CREATED_FILES_LST_FILENAME );
@@ -297,7 +278,7 @@ public class IncrementalBuildHelper
         }
         catch ( IOException e )
         {
-            throw new MojoExecutionException( "Error reading old mojo status", e );
+            throw new MojoException( "Error reading old mojo status", e );
         }
 
         // we remember all files which currently exist in the output directory
@@ -320,10 +301,10 @@ public class IncrementalBuildHelper
      *
      * @param incrementalBuildHelperRequest will contains file sources to store if create files are not yet stored
      *
-     * @throws MojoExecutionException
+     * @throws MojoException
      */
     public void afterRebuildExecution( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
-        throws MojoExecutionException
+        throws MojoException
     {
         DirectoryScanner diffScanner = getDirectoryScanner();
         // now scan the same directory again and create a diff
@@ -339,7 +320,7 @@ public class IncrementalBuildHelper
         }
         catch ( IOException e )
         {
-            throw new MojoExecutionException( "Error while storing the mojo status", e );
+            throw new MojoException( "Error while storing the mojo status", e );
         }
 
         // in case of clean compile the file is not created so next compile won't see it
@@ -354,7 +335,7 @@ public class IncrementalBuildHelper
             }
             catch ( IOException e )
             {
-                throw new MojoExecutionException( "Error while storing the mojo status", e );
+                throw new MojoException( "Error while storing the mojo status", e );
             }
         }
 
