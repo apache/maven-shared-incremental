@@ -26,6 +26,8 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.utils.io.DirectoryScanResult;
 import org.apache.maven.shared.utils.io.DirectoryScanner;
 import org.apache.maven.shared.utils.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +38,9 @@ import java.util.Set;
  */
 public class IncrementalBuildHelper
 {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger( IncrementalBuildHelper.class );
+
     /**
      * the root directory to store status information about Maven executions in.
      */
@@ -169,8 +174,7 @@ public class IncrementalBuildHelper
     public boolean inputFileTreeChanged( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
         throws MojoExecutionException
     {
-        File mojoConfigBase = getMojoStatusDirectory();
-        File mojoConfigFile = new File( mojoConfigBase, INPUT_FILES_LST_FILENAME );
+        File mojoConfigFile = new File( getMojoStatusDirectory(), INPUT_FILES_LST_FILENAME );
 
         String[] oldInputFiles = new String[0];
 
@@ -185,13 +189,8 @@ public class IncrementalBuildHelper
                 throw new MojoExecutionException( "Error reading old mojo status " + mojoConfigFile, e );
             }
         }
-
-        String[] inputFileNames = new String[incrementalBuildHelperRequest.getInputFiles().size()];
-        int i = 0;
-        for ( File inputFile : incrementalBuildHelperRequest.getInputFiles() )
-        {
-            inputFileNames[i++] = inputFile.getAbsolutePath();
-        }
+        String[] inputFileNames = incrementalBuildHelperRequest.getInputFiles()
+                .stream().map( File::getAbsolutePath ).toArray( String[]::new );
 
         DirectoryScanResult dsr = DirectoryScanner.diffFiles( oldInputFiles, inputFileNames );
 
@@ -221,8 +220,7 @@ public class IncrementalBuildHelper
     public boolean inputFileTreeChanged( DirectoryScanner dirScanner )
         throws MojoExecutionException
     {
-        File mojoConfigBase = getMojoStatusDirectory();
-        File mojoConfigFile = new File( mojoConfigBase, INPUT_FILES_LST_FILENAME );
+        File mojoConfigFile = new File( getMojoStatusDirectory(), INPUT_FILES_LST_FILENAME );
 
         String[] oldInputFiles = new String[0];
 
@@ -362,20 +360,7 @@ public class IncrementalBuildHelper
 
     private String[] toArrayOfPath( Set<File> files )
     {
-        if ( files == null || files.isEmpty() )
-        {
-            return EMPTY_ARRAY;
-        }
-        String[] paths = new String[files.size()];
-
-        int i = 0;
-
-        for ( File file : files )
-        {
-            paths[i] = file.getPath();
-            i++;
-        }
-
-        return paths;
+        return  ( files == null || files.isEmpty() )
+                ? EMPTY_ARRAY : files.stream().map( File::getPath ).toArray( String[]::new );
     }
 }

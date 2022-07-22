@@ -42,7 +42,7 @@ public class IncrementalBuildHelperRequest
     {
         if ( inputFiles == null )
         {
-            this.inputFiles = new HashSet<File>();
+            this.inputFiles = new HashSet<>();
         }
         return inputFiles;
     }
