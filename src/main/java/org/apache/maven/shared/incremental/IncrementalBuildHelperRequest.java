@@ -33,6 +33,8 @@ public class IncrementalBuildHelperRequest
 
     private File outputDirectory;
 
+    private boolean test;
+
     public IncrementalBuildHelperRequest()
     {
         // no op
@@ -73,4 +75,16 @@ public class IncrementalBuildHelperRequest
         this.outputDirectory = outputDirectory;
         return this;
     }
+
+    public boolean isTest()
+    {
+        return this.test;
+    }
+
+    public IncrementalBuildHelperRequest test( boolean test )
+    {
+        this.test = test;
+        return this;
+    }
+
 }

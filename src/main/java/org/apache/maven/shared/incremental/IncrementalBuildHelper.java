@@ -31,6 +31,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -47,6 +51,13 @@ public class IncrementalBuildHelper
     private static final String MAVEN_STATUS_ROOT = "maven-status";
     public static final String CREATED_FILES_LST_FILENAME = "createdFiles.lst";
     private static final String INPUT_FILES_LST_FILENAME = "inputFiles.lst";
+
+    private static final String INFO_FILENAME = "info.properties";
+
+    private static final String LAST_COMPILE_SUCCESS_TIMESTAMP = "lastCompile.success.timestamp";
+
+    private static final String LAST_TEST_COMPILE_SUCCESS_TIMESTAMP = "lastTestCompile.success.timestamp";
+
 
     private static final String[] EMPTY_ARRAY = new String[0];
 
@@ -355,7 +366,65 @@ public class IncrementalBuildHelper
                 throw new MojoExecutionException( "Error while storing the mojo status", e );
             }
         }
+    }
 
+    public void afterCompilationSuccess( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
+            throws MojoExecutionException
+    {
+        File mojoConfigBase = getMojoStatusDirectory();
+        File mojoConfigFile = new File( mojoConfigBase, INFO_FILENAME );
+
+        try
+        {
+            if ( !Files.exists( mojoConfigFile.toPath( ) ) )
+            {
+                Files.createFile( mojoConfigFile.toPath() );
+            }
+            Properties properties = new Properties();
+            try ( InputStream inputStream = Files.newInputStream( mojoConfigFile.toPath( ) ) )
+            {
+                properties.load( inputStream );
+                properties.put( incrementalBuildHelperRequest.isTest()
+                                ? LAST_TEST_COMPILE_SUCCESS_TIMESTAMP : LAST_COMPILE_SUCCESS_TIMESTAMP,
+                        Long.toString( System.currentTimeMillis( ) ) );
+            }
+
+            try ( OutputStream outputStream = Files.newOutputStream( mojoConfigFile.toPath( ) ) )
+            {
+                String comments = "Execution of: "
+                        + mojoExecution.getMojoDescriptor().getPluginDescriptor().getArtifactId() + "-"
+                        + mojoExecution.getMojoDescriptor().getGoal() + "-" + mojoExecution.getExecutionId();
+                properties.store( outputStream, comments );
+            }
+        }
+        catch ( IOException e )
+        {
+            throw new MojoExecutionException( e.getMessage(), e );
+        }
+    }
+
+    /**
+     *
+     * @param incrementalBuildHelperRequest
+     * @return return timestamp of the last compilation succes or <code>0</code> if cannot find the information
+     */
+    public long getLastCompilationSuccess( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
+            throws MojoExecutionException, IOException
+    {
+        File mojoConfigBase = getMojoStatusDirectory();
+        File mojoConfigFile = new File( mojoConfigBase, INFO_FILENAME );
+        if ( !Files.exists( mojoConfigFile.toPath( ) ) )
+        {
+            return 0;
+        }
+        Properties properties = new Properties();
+        try ( InputStream inputStream = Files.newInputStream( mojoConfigFile.toPath() ) )
+        {
+            properties.load( inputStream );
+            String value = properties.getProperty( incrementalBuildHelperRequest.isTest()
+                    ? LAST_TEST_COMPILE_SUCCESS_TIMESTAMP : LAST_COMPILE_SUCCESS_TIMESTAMP, "0" );
+            return Long.parseLong( value );
+        }
     }
 
     private String[] toArrayOfPath( Set<File> files )
