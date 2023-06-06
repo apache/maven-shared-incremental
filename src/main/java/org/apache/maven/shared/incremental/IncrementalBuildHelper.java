@@ -31,7 +31,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Various helper methods to support incremental builds
@@ -46,6 +53,7 @@ public class IncrementalBuildHelper
      */
     private static final String MAVEN_STATUS_ROOT = "maven-status";
     public static final String CREATED_FILES_LST_FILENAME = "createdFiles.lst";
+    public static final String GENERATED_FILES_LST_FILENAME = "generatedFiles.lst";
     private static final String INPUT_FILES_LST_FILENAME = "inputFiles.lst";
 
     private static final String[] EMPTY_ARRAY = new String[0];
@@ -61,16 +69,27 @@ public class IncrementalBuildHelper
     private MavenProject mavenProject;
 
     /**
-     * Used for detecting changes between the Mojo execution.
+     * Used for detecting changes in the output directory between the Mojo execution.
      * @see #getDirectoryScanner();
      */
-    private DirectoryScanner directoryScanner;
+    private DirectoryScanner directoryScanner = new DirectoryScanner();
+
+    /**
+     * Used for detecting changes in the generated sources directory between the Mojo execution.
+     */
+    private DirectoryScanner generatedSourcesDirectoryScanner = new DirectoryScanner();
 
     /**
      * Once the {@link #beforeRebuildExecution(org.apache.maven.shared.incremental.IncrementalBuildHelperRequest)} got
      * called, this will contain the list of files in the build directory.
      */
     private String[] filesBeforeAction = new String[0];
+
+    /**
+     * Once the {@link #beforeRebuildExecution(org.apache.maven.shared.incremental.IncrementalBuildHelperRequest)} got
+     * called, this will contain the list of files in the generated sources directory.
+     */
+    private String[] generatedSourcesBeforeAction = new String[0];
 
     public IncrementalBuildHelper( MojoExecution mojoExecution, MavenSession mavenSession )
     {
@@ -112,11 +131,6 @@ public class IncrementalBuildHelper
      */
     public DirectoryScanner getDirectoryScanner()
     {
-        if ( directoryScanner == null )
-        {
-            directoryScanner = new DirectoryScanner();
-        }
-
         return directoryScanner;
     }
 
@@ -280,18 +294,19 @@ public class IncrementalBuildHelper
         throws MojoExecutionException
     {
         File mojoConfigBase = getMojoStatusDirectory();
-        File mojoConfigFile = new File( mojoConfigBase, CREATED_FILES_LST_FILENAME );
+        File mojoCreatedFiles = new File( mojoConfigBase, CREATED_FILES_LST_FILENAME );
+        File mojoGeneratedFile = new File( mojoConfigBase, GENERATED_FILES_LST_FILENAME );
 
-        String[] oldFiles;
+        List<String> deletedFiles = new ArrayList<>();
 
         try
         {
-            oldFiles = FileUtils.fileReadArray( mojoConfigFile );
-            for ( String oldFileName : oldFiles )
-            {
-                File oldFile = new File( incrementalBuildHelperRequest.getOutputDirectory(), oldFileName );
-                oldFile.delete();
-            }
+            deletedFiles.addAll(
+                    deleteFiles( mojoCreatedFiles,
+                            incrementalBuildHelperRequest.getOutputDirectory() ) );
+            deletedFiles.addAll(
+                    deleteFiles( mojoGeneratedFile,
+                            incrementalBuildHelperRequest.getGeneratedSourcesDirectory() ) );
         }
         catch ( IOException e )
         {
@@ -299,15 +314,12 @@ public class IncrementalBuildHelper
         }
 
         // we remember all files which currently exist in the output directory
-        DirectoryScanner diffScanner = getDirectoryScanner();
-        diffScanner.setBasedir( incrementalBuildHelperRequest.getOutputDirectory() );
-        if ( incrementalBuildHelperRequest.getOutputDirectory().exists() )
-        {
-            diffScanner.scan();
-            filesBeforeAction = diffScanner.getIncludedFiles();
-        }
+        filesBeforeAction = scanDirectory( getDirectoryScanner(),
+                incrementalBuildHelperRequest.getOutputDirectory() );
+        generatedSourcesBeforeAction = scanDirectory( generatedSourcesDirectoryScanner,
+                incrementalBuildHelperRequest.getGeneratedSourcesDirectory() );
 
-        return oldFiles;
+        return deletedFiles.toArray( new String[0] );
     }
 
     /**
@@ -323,25 +335,23 @@ public class IncrementalBuildHelper
     public void afterRebuildExecution( IncrementalBuildHelperRequest incrementalBuildHelperRequest )
         throws MojoExecutionException
     {
-        DirectoryScanner diffScanner = getDirectoryScanner();
-        // now scan the same directory again and create a diff
-        diffScanner.scan();
-        DirectoryScanResult scanResult = diffScanner.diffIncludedFiles( filesBeforeAction );
-
         File mojoConfigBase = getMojoStatusDirectory();
-        File mojoConfigFile = new File( mojoConfigBase, CREATED_FILES_LST_FILENAME );
 
-        try
-        {
-            FileUtils.fileWriteArray( mojoConfigFile, scanResult.getFilesAdded() );
-        }
-        catch ( IOException e )
-        {
-            throw new MojoExecutionException( "Error while storing the mojo status", e );
-        }
+        writeChangedFiles(
+                getDirectoryScanner(),
+                filesBeforeAction,
+                mojoConfigBase,
+                CREATED_FILES_LST_FILENAME );
+
+        writeChangedFiles(
+                generatedSourcesDirectoryScanner,
+                generatedSourcesBeforeAction,
+                mojoConfigBase,
+                GENERATED_FILES_LST_FILENAME );
 
         // in case of clean compile the file is not created so next compile won't see it
         // we mus create it here
+        File mojoConfigFile;
         mojoConfigFile = new File( mojoConfigBase, INPUT_FILES_LST_FILENAME );
         if ( !mojoConfigFile.exists() )
         {
@@ -356,6 +366,79 @@ public class IncrementalBuildHelper
             }
         }
 
+    }
+
+    private void writeChangedFiles(
+            DirectoryScanner directoryScanner,
+            String[] filesBeforeAction,
+            File mojoConfigBase,
+            String createdFilesListFileName ) throws MojoExecutionException
+    {
+        if ( directoryScanner.getBasedir() == null )
+        {
+            return;
+        }
+
+        DirectoryScanResult outputDirectoryScanResult = scanDirectoryDiff(
+                directoryScanner, filesBeforeAction );
+
+        try
+        {
+            writeChangedFiles( outputDirectoryScanResult, mojoConfigBase, createdFilesListFileName );
+        }
+        catch ( IOException e )
+        {
+            throw new MojoExecutionException( "Error while storing the mojo status", e );
+        }
+    }
+
+    private static void writeChangedFiles(
+            DirectoryScanResult outputDirectoryScanResult,
+            File mojoConfigBase,
+            String createdFilesListFileName )
+            throws IOException
+    {
+        File createdFiles = new File( mojoConfigBase, createdFilesListFileName );
+        String[] filesAdded = outputDirectoryScanResult.getFilesAdded();
+        String filesAddedAsString = Stream.of( filesAdded ).collect( Collectors.joining( "\n" ) );
+
+        Files.write(
+                createdFiles.toPath(),
+                filesAddedAsString.getBytes( StandardCharsets.UTF_8 ),
+                StandardOpenOption.CREATE );
+    }
+
+    private static DirectoryScanResult scanDirectoryDiff(
+            DirectoryScanner directoryScanner,
+            String[] filesBeforeAction )
+    {
+        // now scan the same directory again and create a diff
+        directoryScanner.scan();
+        DirectoryScanResult outputScanResult =
+                directoryScanner.diffIncludedFiles( filesBeforeAction );
+        return outputScanResult;
+    }
+
+    private static List<String> deleteFiles( File fileNameIndex, File parent ) throws IOException
+    {
+        List<String> oldFiles = Files.readAllLines( fileNameIndex.toPath() );
+        for ( String oldFileName : oldFiles )
+        {
+            File oldFile = new File( parent, oldFileName );
+            oldFile.delete();
+        }
+        return oldFiles;
+    }
+
+    private String[] scanDirectory( DirectoryScanner directoryScanner, File directory )
+    {
+        directoryScanner.setBasedir( directory );
+        if ( directory != null && directory.exists() )
+        {
+            directoryScanner.scan();
+            return directoryScanner.getIncludedFiles();
+        }
+        return new String[0];
     }
 
     private String[] toArrayOfPath( Set<File> files )

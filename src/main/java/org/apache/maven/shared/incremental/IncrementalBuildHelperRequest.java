@@ -33,6 +33,8 @@ public class IncrementalBuildHelperRequest
 
     private File outputDirectory;
 
+    private File generatedSourcesDirectory;
+
     public IncrementalBuildHelperRequest()
     {
         // no op
@@ -71,6 +73,22 @@ public class IncrementalBuildHelperRequest
     public IncrementalBuildHelperRequest outputDirectory( File outputDirectory )
     {
         this.outputDirectory = outputDirectory;
+        return this;
+    }
+
+    public File getGeneratedSourcesDirectory()
+    {
+        return generatedSourcesDirectory;
+    }
+
+    public void setGeneratedSourcesDirectory( File generatedSourcesDirectory )
+    {
+        this.generatedSourcesDirectory = generatedSourcesDirectory;
+    }
+
+    public IncrementalBuildHelperRequest generatedSourcesDirectory( File generatedSourcesDirectory )
+    {
+        this.generatedSourcesDirectory = generatedSourcesDirectory;
         return this;
     }
 }
