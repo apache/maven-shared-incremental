@@ -1,5 +1,3 @@
-package org.apache.maven.shared.incremental;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +16,7 @@ package org.apache.maven.shared.incremental;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.maven.shared.incremental;
 
 import java.io.File;
 import java.util.HashSet;
@@ -27,49 +26,40 @@ import java.util.Set;
  * @author Olivier Lamy
  * @since 1.1
  */
-public class IncrementalBuildHelperRequest
-{
+public class IncrementalBuildHelperRequest {
     private Set<File> inputFiles;
 
     private File outputDirectory;
 
-    public IncrementalBuildHelperRequest()
-    {
+    public IncrementalBuildHelperRequest() {
         // no op
     }
 
-    public Set<File> getInputFiles()
-    {
-        if ( inputFiles == null )
-        {
+    public Set<File> getInputFiles() {
+        if (inputFiles == null) {
             this.inputFiles = new HashSet<>();
         }
         return inputFiles;
     }
 
-    public void setInputFiles( Set<File> inputFiles )
-    {
+    public void setInputFiles(Set<File> inputFiles) {
         this.inputFiles = inputFiles;
     }
 
-    public IncrementalBuildHelperRequest inputFiles( Set<File> inputFiles )
-    {
+    public IncrementalBuildHelperRequest inputFiles(Set<File> inputFiles) {
         this.inputFiles = inputFiles;
         return this;
     }
 
-    public File getOutputDirectory()
-    {
+    public File getOutputDirectory() {
         return outputDirectory;
     }
 
-    public void setOutputDirectory( File outputDirectory )
-    {
+    public void setOutputDirectory(File outputDirectory) {
         this.outputDirectory = outputDirectory;
     }
 
-    public IncrementalBuildHelperRequest outputDirectory( File outputDirectory )
-    {
+    public IncrementalBuildHelperRequest outputDirectory(File outputDirectory) {
         this.outputDirectory = outputDirectory;
         return this;
     }
