@@ -40,8 +40,8 @@
     <url>https://github.com/apache/maven-shared-incremental/tree/${project.scm.tag}</url>
   </scm>
   <issueManagement>
-    <system>jira</system>
-    <url>https://issues.apache.org/jira/browse/MSHARED/component/12326453</url>
+    <system>GitHub Issues</system>
+    <url>https://github.com/apache/maven-shared-incremental/issues</url>
   </issueManagement>
   <ciManagement>
     <system>Jenkins</system>
