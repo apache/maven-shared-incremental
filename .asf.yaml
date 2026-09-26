@@ -16,7 +16,7 @@
 #
 # see https://s.apache.org/asfyaml
 github:
-  description: "Apache Maven Shared Incremental"
+  description: "Apache Maven Shared Incremental (RETIRED)"
   homepage: https://maven.apache.org/shared/maven-shared-incremental/
   labels:
     - java
@@ -31,8 +31,6 @@ github:
     squash: true
     merge: false
     rebase: true
-  autolink_jira:
-    - MSHARED
   features:
     issues: true
 notifications:
